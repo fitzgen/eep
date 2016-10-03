@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
 
-use traits::{Trace, TraceKind, TraceSink};
+use traits::{Trace, TraceId, TraceSink};
 
 #[derive(Clone, Debug)]
 pub struct TraceRingBuffer<T> {
@@ -79,11 +79,35 @@ impl<T> TraceRingBuffer<T> {
 impl<T> TraceSink<T> for TraceRingBuffer<T>
     where T: Trace
 {
-    fn trace(&mut self, trace: T) {
+    fn trace_event(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
         let entry: TraceEntry<T> = TraceEntry {
             timestamp: NsSinceEpoch::now(),
             tag: trace.tag(),
-            kind: trace.kind(),
+            kind: TraceKind::Event,
+            phantom: PhantomData,
+        };
+        let entry: [u8; 13] = unsafe { mem::transmute(entry) };
+        self.write(&entry);
+        T::Id::new_id()
+    }
+
+    fn trace_start(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
+        let entry: TraceEntry<T> = TraceEntry {
+            timestamp: NsSinceEpoch::now(),
+            tag: trace.tag(),
+            kind: TraceKind::Start,
+            phantom: PhantomData,
+        };
+        let entry: [u8; 13] = unsafe { mem::transmute(entry) };
+        self.write(&entry);
+        T::Id::new_id()
+    }
+
+    fn trace_stop(&mut self, trace: T) {
+        let entry: TraceEntry<T> = TraceEntry {
+            timestamp: NsSinceEpoch::now(),
+            tag: trace.tag(),
+            kind: TraceKind::Stop,
             phantom: PhantomData,
         };
         let entry: [u8; 13] = unsafe { mem::transmute(entry) };
@@ -102,6 +126,14 @@ impl NsSinceEpoch {
         let nsec = timespec.nsec as u64;
         NsSinceEpoch(sec * 1_000_000_000 + nsec)
     }
+}
+
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum TraceKind {
+    Event = 0x0,
+    Start = 0x1,
+    Stop = 0x2,
 }
 
 #[repr(packed)]
@@ -143,12 +175,11 @@ enum TraceRingBufferIterState<'a, T>
     NonEmpty {
         buffer: &'a TraceRingBuffer<T>,
         idx: usize,
-    }
+    },
 }
 
 #[derive(Clone, Debug)]
-pub struct TraceRingBufferIter<'a, T>(TraceRingBufferIterState<'a, T>)
-    where T: 'a;
+pub struct TraceRingBufferIter<'a, T>(TraceRingBufferIterState<'a, T>) where T: 'a;
 
 impl<'a, T> Iterator for TraceRingBufferIter<'a, T> {
     type Item = TraceEntry<T>;
@@ -162,7 +193,8 @@ impl<'a, T> Iterator for TraceRingBufferIter<'a, T> {
                         let mut temp = [0; 13];
                         let middle = buffer.data.len() - idx;
                         temp[..middle].copy_from_slice(&buffer.data[idx..]);
-                        temp[middle..].copy_from_slice(&buffer.data[..TraceEntry::<T>::size() - middle]);
+                        temp[middle..]
+                            .copy_from_slice(&buffer.data[..TraceEntry::<T>::size() - middle]);
                         Some(mem::transmute(temp))
                     } else {
                         let entry_ptr = buffer.data[idx..].as_ptr() as *const TraceEntry<T>;
@@ -193,7 +225,7 @@ impl<'a, T> Iterator for TraceRingBufferIter<'a, T> {
 mod tests {
     use super::*;
     use simple_trace::{SimpleTrace, SimpleTraceBuffer};
-    use traits::{Trace, TraceKind, TraceSink};
+    use traits::{Trace, TraceSink};
 
     type SimpleTraceEntry = TraceEntry<SimpleTrace>;
 
@@ -205,42 +237,42 @@ mod tests {
     #[test]
     fn trace_ring_buffer_no_roll_over() {
         let mut buffer = SimpleTraceBuffer::new(100 * SimpleTraceEntry::size());
-        buffer.trace(SimpleTrace::FooEvent);
-        buffer.trace(SimpleTrace::StartThing);
-        buffer.trace(SimpleTrace::StartAnother);
-        buffer.trace(SimpleTrace::FooEvent);
-        buffer.trace(SimpleTrace::StopThing);
-        buffer.trace(SimpleTrace::StopAnother);
+        buffer.trace_event(SimpleTrace::FooEvent, None);
+        buffer.trace_start(SimpleTrace::OperationThing, None);
+        buffer.trace_start(SimpleTrace::OperationAnother, None);
+        buffer.trace_event(SimpleTrace::FooEvent, None);
+        buffer.trace_stop(SimpleTrace::OperationThing);
+        buffer.trace_stop(SimpleTrace::OperationAnother);
 
         let mut iter = buffer.iter();
 
         let entry = iter.next().unwrap();
         assert_eq!(entry.tag(), SimpleTrace::FooEvent.tag());
-        assert_eq!(entry.kind(), TraceKind::Signpost);
+        assert_eq!(entry.kind(), TraceKind::Event);
         assert_eq!(entry.label(), "Foo");
 
         let entry = iter.next().unwrap();
-        assert_eq!(entry.tag(), SimpleTrace::StartThing.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
         assert_eq!(entry.kind(), TraceKind::Start);
         assert_eq!(entry.label(), "Thing");
 
         let entry = iter.next().unwrap();
-        assert_eq!(entry.tag(), SimpleTrace::StartAnother.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationAnother.tag());
         assert_eq!(entry.kind(), TraceKind::Start);
         assert_eq!(entry.label(), "Another");
 
         let entry = iter.next().unwrap();
         assert_eq!(entry.tag(), SimpleTrace::FooEvent.tag());
-        assert_eq!(entry.kind(), TraceKind::Signpost);
+        assert_eq!(entry.kind(), TraceKind::Event);
         assert_eq!(entry.label(), "Foo");
 
         let entry = iter.next().unwrap();
-        assert_eq!(entry.tag(), SimpleTrace::StopThing.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
         assert_eq!(entry.kind(), TraceKind::Stop);
         assert_eq!(entry.label(), "Thing");
 
         let entry = iter.next().unwrap();
-        assert_eq!(entry.tag(), SimpleTrace::StopAnother.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationAnother.tag());
         assert_eq!(entry.kind(), TraceKind::Stop);
         assert_eq!(entry.label(), "Another");
 
@@ -250,12 +282,12 @@ mod tests {
     #[test]
     fn trace_ring_buffer_with_roll_over() {
         let mut buffer = SimpleTraceBuffer::new(5 * SimpleTraceEntry::size());
-        buffer.trace(SimpleTrace::FooEvent);
-        buffer.trace(SimpleTrace::StartThing);
-        buffer.trace(SimpleTrace::StartAnother);
-        buffer.trace(SimpleTrace::FooEvent);
-        buffer.trace(SimpleTrace::StopThing);
-        buffer.trace(SimpleTrace::StopAnother);
+        buffer.trace_event(SimpleTrace::FooEvent, None);
+        buffer.trace_start(SimpleTrace::OperationThing, None);
+        buffer.trace_start(SimpleTrace::OperationAnother, None);
+        buffer.trace_event(SimpleTrace::FooEvent, None);
+        buffer.trace_stop(SimpleTrace::OperationThing);
+        buffer.trace_stop(SimpleTrace::OperationAnother);
 
         println!("buffer = {:#?}", buffer);
 
@@ -263,31 +295,31 @@ mod tests {
 
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);
-        assert_eq!(entry.tag(), SimpleTrace::StartThing.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
         assert_eq!(entry.kind(), TraceKind::Start);
         assert_eq!(entry.label(), "Thing");
 
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);
-        assert_eq!(entry.tag(), SimpleTrace::StartAnother.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationAnother.tag());
         assert_eq!(entry.kind(), TraceKind::Start);
         assert_eq!(entry.label(), "Another");
 
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);
         assert_eq!(entry.tag(), SimpleTrace::FooEvent.tag());
-        assert_eq!(entry.kind(), TraceKind::Signpost);
+        assert_eq!(entry.kind(), TraceKind::Event);
         assert_eq!(entry.label(), "Foo");
 
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);
-        assert_eq!(entry.tag(), SimpleTrace::StopThing.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
         assert_eq!(entry.kind(), TraceKind::Stop);
         assert_eq!(entry.label(), "Thing");
 
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);
-        assert_eq!(entry.tag(), SimpleTrace::StopAnother.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationAnother.tag());
         assert_eq!(entry.kind(), TraceKind::Stop);
         assert_eq!(entry.label(), "Another");
 
@@ -297,12 +329,12 @@ mod tests {
     #[test]
     fn trace_ring_buffer_with_roll_over_and_does_not_divide_evenly() {
         let mut buffer = SimpleTraceBuffer::new(3 * SimpleTraceEntry::size() + 1);
-        buffer.trace(SimpleTrace::FooEvent);
-        buffer.trace(SimpleTrace::StartThing);
-        buffer.trace(SimpleTrace::StartAnother);
-        buffer.trace(SimpleTrace::FooEvent);
-        buffer.trace(SimpleTrace::StopThing);
-        buffer.trace(SimpleTrace::StopAnother);
+        buffer.trace_event(SimpleTrace::FooEvent, None);
+        buffer.trace_start(SimpleTrace::OperationThing, None);
+        buffer.trace_start(SimpleTrace::OperationAnother, None);
+        buffer.trace_event(SimpleTrace::FooEvent, None);
+        buffer.trace_stop(SimpleTrace::OperationThing);
+        buffer.trace_stop(SimpleTrace::OperationAnother);
 
         println!("buffer = {:#?}", buffer);
 
@@ -311,18 +343,18 @@ mod tests {
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);
         assert_eq!(entry.tag(), SimpleTrace::FooEvent.tag());
-        assert_eq!(entry.kind(), TraceKind::Signpost);
+        assert_eq!(entry.kind(), TraceKind::Event);
         assert_eq!(entry.label(), "Foo");
 
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);
-        assert_eq!(entry.tag(), SimpleTrace::StopThing.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
         assert_eq!(entry.kind(), TraceKind::Stop);
         assert_eq!(entry.label(), "Thing");
 
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);
-        assert_eq!(entry.tag(), SimpleTrace::StopAnother.tag());
+        assert_eq!(entry.tag(), SimpleTrace::OperationAnother.tag());
         assert_eq!(entry.kind(), TraceKind::Stop);
         assert_eq!(entry.label(), "Another");
 

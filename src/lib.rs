@@ -6,5 +6,6 @@ extern crate leb128;
 pub mod signpost;
 
 pub mod simple_trace;
+pub mod thread_and_local_id;
 pub mod traits;
 pub mod trace_ring_buffer;

@@ -1,3 +1,5 @@
+extern crate time;
+
 use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
@@ -70,7 +72,7 @@ impl<T> TraceRingBuffer<T> {
         }
 
         self.length += TraceEntry::<T>::size();
-        // debug_assert!(self.length <= capacity);
+        debug_assert!(self.length <= capacity);
     }
 }
 
@@ -79,18 +81,33 @@ impl<T> TraceSink<T> for TraceRingBuffer<T>
 {
     fn trace(&mut self, trace: T) {
         let entry: TraceEntry<T> = TraceEntry {
+            timestamp: NsSinceEpoch::now(),
             tag: trace.tag(),
             kind: trace.kind(),
             phantom: PhantomData,
         };
-        let entry: [u8; 5] = unsafe { mem::transmute(entry) };
+        let entry: [u8; 13] = unsafe { mem::transmute(entry) };
         self.write(&entry);
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct NsSinceEpoch(pub u64);
+
+impl NsSinceEpoch {
+    #[inline(always)]
+    pub fn now() -> NsSinceEpoch {
+        let timespec = time::get_time();
+        let sec = timespec.sec as u64;
+        let nsec = timespec.nsec as u64;
+        NsSinceEpoch(sec * 1_000_000_000 + nsec)
     }
 }
 
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct TraceEntry<T> {
+    timestamp: NsSinceEpoch,
     tag: u32,
     kind: TraceKind,
     phantom: PhantomData<T>,
@@ -118,9 +135,6 @@ impl<T> TraceEntry<T> {
     }
 }
 
-// TODO FITZGEN: make this into a two state enum where one is empty and one has
-// items. check which one to make on iter() and check which to transition to at
-// end of next()
 #[derive(Clone, Debug)]
 enum TraceRingBufferIterState<'a, T>
     where T: 'a
@@ -145,7 +159,7 @@ impl<'a, T> Iterator for TraceRingBufferIter<'a, T> {
             TraceRingBufferIterState::NonEmpty { ref buffer, idx } => {
                 let result = unsafe {
                     if idx + TraceEntry::<T>::size() > buffer.data.len() {
-                        let mut temp = [0; 5];
+                        let mut temp = [0; 13];
                         let middle = buffer.data.len() - idx;
                         temp[..middle].copy_from_slice(&buffer.data[idx..]);
                         temp[middle..].copy_from_slice(&buffer.data[..TraceEntry::<T>::size() - middle]);
@@ -185,7 +199,7 @@ mod tests {
 
     #[test]
     fn trace_entry_has_right_size() {
-        assert_eq!(SimpleTraceEntry::size(), 5);
+        assert_eq!(SimpleTraceEntry::size(), 13);
     }
 
     #[test]

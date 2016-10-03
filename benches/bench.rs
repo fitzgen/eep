@@ -78,4 +78,27 @@ mod benches {
             b.iter(|| test::black_box(new_trace_id()));
         }
     }
+
+    #[cfg(feature = "signpost")]
+    mod signpost {
+        extern crate hydra;
+        extern crate test;
+
+        use self::hydra::signpost::Signpost;
+        use self::hydra::simple_trace::SimpleTrace;
+        use self::hydra::traits::TraceSink;
+
+        #[bench]
+        fn signpost_event(b: &mut test::Bencher) {
+            b.iter(|| Signpost::get().trace(SimpleTrace::FooEvent));
+        }
+
+        #[bench]
+        fn signpost_start_stop(b: &mut test::Bencher) {
+            b.iter(|| {
+                Signpost::get().trace(SimpleTrace::StartThing);
+                Signpost::get().trace(SimpleTrace::StopThing);
+            });
+        }
+    }
 }

@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use std::mem;
 use std::ptr;
 
-use traits::{Trace, TraceId, TraceSink};
+use traits::{ThreadId, Trace, TraceId, TraceSink};
 
 #[derive(Clone, Debug)]
 pub struct RingBuffer<T> {
@@ -80,37 +80,52 @@ impl<T> TraceSink<T> for RingBuffer<T>
     where T: Trace
 {
     fn trace_event(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
+        let id = T::Id::new_id();
+
         let entry: Entry<T> = Entry {
+            thread: id.thread(),
             timestamp: NsSinceEpoch::now(),
+            id: id.u32(),
             tag: trace.tag(),
             kind: TraceKind::Event,
             phantom: PhantomData,
         };
-        let entry: [u8; 13] = unsafe { mem::transmute(entry) };
+
+        let entry: [u8; 33] = unsafe { mem::transmute(entry) };
         self.write(&entry);
-        T::Id::new_id()
+
+        id
     }
 
     fn trace_start(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
+        let id = T::Id::new_id();
+
         let entry: Entry<T> = Entry {
+            thread: id.thread(),
             timestamp: NsSinceEpoch::now(),
+            id: id.u32(),
             tag: trace.tag(),
             kind: TraceKind::Start,
             phantom: PhantomData,
         };
-        let entry: [u8; 13] = unsafe { mem::transmute(entry) };
+
+        let entry: [u8; 33] = unsafe { mem::transmute(entry) };
         self.write(&entry);
-        T::Id::new_id()
+
+        id
     }
 
-    fn trace_stop(&mut self, trace: T) {
+    fn trace_stop(&mut self, id: T::Id, trace: T) {
         let entry: Entry<T> = Entry {
+            thread: id.thread(),
             timestamp: NsSinceEpoch::now(),
+            id: id.u32(),
             tag: trace.tag(),
             kind: TraceKind::Stop,
             phantom: PhantomData,
         };
-        let entry: [u8; 13] = unsafe { mem::transmute(entry) };
+
+        let entry: [u8; 33] = unsafe { mem::transmute(entry) };
         self.write(&entry);
     }
 }
@@ -139,8 +154,10 @@ pub enum TraceKind {
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Entry<T> {
-    timestamp: NsSinceEpoch,
+    thread: Option<ThreadId>,
+    id: u32,
     tag: u32,
+    timestamp: NsSinceEpoch,
     kind: TraceKind,
     phantom: PhantomData<T>,
 }
@@ -160,6 +177,18 @@ impl<T> Entry<T> {
 
     pub fn kind(&self) -> TraceKind {
         self.kind
+    }
+
+    pub fn timestamp(&self) -> NsSinceEpoch {
+        self.timestamp
+    }
+
+    pub fn thread(&self) -> Option<ThreadId> {
+        self.thread
+    }
+
+    pub fn id(&self) -> u32 {
+        self.id
     }
 
     fn size() -> usize {
@@ -190,7 +219,7 @@ impl<'a, T> Iterator for RingBufferIter<'a, T> {
             RingBufferIterState::NonEmpty { ref buffer, idx } => {
                 let result = unsafe {
                     if idx + Entry::<T>::size() > buffer.data.len() {
-                        let mut temp = [0; 13];
+                        let mut temp = [0; 33];
                         let middle = buffer.data.len() - idx;
                         temp[..middle].copy_from_slice(&buffer.data[idx..]);
                         temp[middle..]
@@ -231,18 +260,18 @@ mod tests {
 
     #[test]
     fn trace_entry_has_right_size() {
-        assert_eq!(SimpleEntry::size(), 13);
+        assert_eq!(SimpleEntry::size(), 33);
     }
 
     #[test]
     fn no_roll_over() {
         let mut buffer = SimpleTraceBuffer::new(100 * SimpleEntry::size());
         buffer.trace_event(SimpleTrace::FooEvent, None);
-        buffer.trace_start(SimpleTrace::OperationThing, None);
-        buffer.trace_start(SimpleTrace::OperationAnother, None);
+        let thing_id = buffer.trace_start(SimpleTrace::OperationThing, None);
+        let another_id = buffer.trace_start(SimpleTrace::OperationAnother, None);
         buffer.trace_event(SimpleTrace::FooEvent, None);
-        buffer.trace_stop(SimpleTrace::OperationThing);
-        buffer.trace_stop(SimpleTrace::OperationAnother);
+        buffer.trace_stop(thing_id, SimpleTrace::OperationThing);
+        buffer.trace_stop(another_id, SimpleTrace::OperationAnother);
 
         let mut iter = buffer.iter();
 
@@ -283,11 +312,11 @@ mod tests {
     fn with_roll_over() {
         let mut buffer = SimpleTraceBuffer::new(5 * SimpleEntry::size());
         buffer.trace_event(SimpleTrace::FooEvent, None);
-        buffer.trace_start(SimpleTrace::OperationThing, None);
-        buffer.trace_start(SimpleTrace::OperationAnother, None);
+        let thing_id = buffer.trace_start(SimpleTrace::OperationThing, None);
+        let another_id = buffer.trace_start(SimpleTrace::OperationAnother, None);
         buffer.trace_event(SimpleTrace::FooEvent, None);
-        buffer.trace_stop(SimpleTrace::OperationThing);
-        buffer.trace_stop(SimpleTrace::OperationAnother);
+        buffer.trace_stop(thing_id, SimpleTrace::OperationThing);
+        buffer.trace_stop(another_id, SimpleTrace::OperationAnother);
 
         println!("buffer = {:#?}", buffer);
 
@@ -330,11 +359,11 @@ mod tests {
     fn with_roll_over_and_does_not_divide_evenly() {
         let mut buffer = SimpleTraceBuffer::new(3 * SimpleEntry::size() + 1);
         buffer.trace_event(SimpleTrace::FooEvent, None);
-        buffer.trace_start(SimpleTrace::OperationThing, None);
-        buffer.trace_start(SimpleTrace::OperationAnother, None);
+        let thing_id = buffer.trace_start(SimpleTrace::OperationThing, None);
+        let another_id = buffer.trace_start(SimpleTrace::OperationAnother, None);
         buffer.trace_event(SimpleTrace::FooEvent, None);
-        buffer.trace_stop(SimpleTrace::OperationThing);
-        buffer.trace_stop(SimpleTrace::OperationAnother);
+        buffer.trace_stop(thing_id, SimpleTrace::OperationThing);
+        buffer.trace_stop(another_id, SimpleTrace::OperationAnother);
 
         println!("buffer = {:#?}", buffer);
 

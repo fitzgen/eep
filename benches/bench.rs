@@ -11,7 +11,7 @@ mod benches {
 
         #[bench]
         fn small_capacity(b: &mut test::Bencher) {
-            let mut buffer = SimpleTraceBuffer::new(27);
+            let mut buffer = SimpleTraceBuffer::new(100);
             b.iter(|| buffer.trace_event(SimpleTrace::FooEvent, None));
             test::black_box(buffer);
         }
@@ -83,8 +83,8 @@ mod benches {
         #[bench]
         fn signpost_start_stop(b: &mut test::Bencher) {
             b.iter(|| {
-                Signpost::get().trace_start(SimpleTrace::OperationThing, None);
-                Signpost::get().trace_stop(SimpleTrace::OperationThing);
+                let id = Signpost::get().trace_start(SimpleTrace::OperationThing, None);
+                Signpost::get().trace_stop(id, SimpleTrace::OperationThing);
             });
         }
     }

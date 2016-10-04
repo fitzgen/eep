@@ -34,24 +34,20 @@ impl Trace for SimpleTrace {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct SimpleTraceId(pub u32);
 
-impl Into<u32> for SimpleTraceId {
-    fn into(self) -> u32 {
-        self.0
-    }
-}
-
-impl Into<Option<ThreadId>> for SimpleTraceId {
-    fn into(self) -> Option<ThreadId> {
-        None
-    }
-}
-
 static SIMPLE_TRACE_ID_COUNTER: AtomicUsize = ATOMIC_USIZE_INIT;
 
 impl TraceId for SimpleTraceId {
     fn new_id() -> Self {
         let id = SIMPLE_TRACE_ID_COUNTER.fetch_add(1, Ordering::AcqRel);
         SimpleTraceId((id % (::std::u32::MAX as usize)) as u32)
+    }
+
+    fn u32(&self) -> u32 {
+        self.0
+    }
+
+    fn thread(&self) -> Option<ThreadId> {
+        None
     }
 }
 

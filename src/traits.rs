@@ -1,24 +1,34 @@
 extern crate thread_id;
 
+/// A unique identifier for a thread.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct ThreadId(pub usize);
 
 impl ThreadId {
+    /// Get the current thread's ID.
     pub fn get() -> ThreadId {
         ThreadId(thread_id::get())
     }
 }
 
-/// The pair of `(id.into<u32>, id.into<Option<ThreadId>>())` must be unique
-/// across all IDs of a particalur `TraceId` type. In other words, either:
+/// A unique identifier for a traced event or start/stop pair.
 ///
-///   * `id.into::<u32>()` is unique and the `Option<ThreadId>` can always be
-///     `None`, or
+/// The pair of `(id.u32(), id.thread())` must be unique across all IDs of a
+/// particalur `TraceId` type. In other words, either:
 ///
-///   * `id.into::<u32>()` is unique within a thread, and `Option<ThreadId>` is
-///     `Some` to disambiguate IDs across threads.
-pub trait TraceId: Copy + Into<u32> + Into<Option<ThreadId>> {
+///   * `id.u32()` is unique and `id.thread()` can always return `None`, or
+///
+///   * `id.u32()` is only unique within a thread, not globally, and
+///     `id.thread()` always returns `Some` to disambiguate IDs across threads.
+pub trait TraceId: Copy {
+    /// Construct a fresh ID.
     fn new_id() -> Self;
+
+    /// Turn this `TraceId` into a `u32`.
+    fn u32(&self) -> u32;
+
+    /// Get the ID of the thread upon which this ID's trace was taken.
+    fn thread(&self) -> Option<ThreadId>;
 }
 
 /// TODO FITZGEN
@@ -32,11 +42,20 @@ pub trait Trace: Copy {
     fn tag(&self) -> u32;
 }
 
+/// TODO FITZGEN
 pub trait TraceSink<T>
     where T: Trace
 {
+    /// Trace a one-off event.
     fn trace_event(&mut self, trace: T, why: Option<T::Id>) -> T::Id;
 
+    /// Trace the start of an operation.
+    ///
+    /// Finish the trace by calling `trace_stop` with the returned ID.
     fn trace_start(&mut self, trace: T, why: Option<T::Id>) -> T::Id;
-    fn trace_stop(&mut self, trace: T);
+
+    /// Trace the end of the operation with the given `id`.
+    ///
+    /// Start the trace by calling `trace_start` to obtain an ID.
+    fn trace_stop(&mut self, id: T::Id, trace: T);
 }

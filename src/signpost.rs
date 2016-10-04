@@ -27,7 +27,7 @@ impl<T> TraceSink<T> for Signpost<T>
         T::Id::new_id()
     }
 
-    fn trace_stop(&mut self, trace: T) {
+    fn trace_stop(&mut self, _id: T::Id, trace: T) {
         signpost::end(trace.tag(), &EMPTY_ARGS);
     }
 }
@@ -41,10 +41,10 @@ mod tests {
     #[test]
     fn signpost_sanity_check() {
         Signpost::get().trace_event(SimpleTrace::FooEvent, None);
-        Signpost::get().trace_start(SimpleTrace::OperationThing, None);
-        Signpost::get().trace_start(SimpleTrace::OperationAnother, None);
+        let thing_id = Signpost::get().trace_start(SimpleTrace::OperationThing, None);
+        let another_id = Signpost::get().trace_start(SimpleTrace::OperationAnother, None);
         Signpost::get().trace_event(SimpleTrace::FooEvent, None);
-        Signpost::get().trace_stop(SimpleTrace::OperationAnother);
-        Signpost::get().trace_stop(SimpleTrace::OperationThing);
+        Signpost::get().trace_stop(another_id, SimpleTrace::OperationAnother);
+        Signpost::get().trace_stop(thing_id, SimpleTrace::OperationThing);
     }
 }

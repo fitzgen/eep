@@ -7,7 +7,7 @@ use std::ptr;
 use traits::{Trace, TraceId, TraceSink};
 
 #[derive(Clone, Debug)]
-pub struct TraceRingBuffer<T> {
+pub struct RingBuffer<T> {
     // The data itself.
     data: Vec<u8>,
 
@@ -20,16 +20,16 @@ pub struct TraceRingBuffer<T> {
     phantom: PhantomData<T>,
 }
 
-impl<T> Default for TraceRingBuffer<T> {
-    fn default() -> TraceRingBuffer<T> {
+impl<T> Default for RingBuffer<T> {
+    fn default() -> RingBuffer<T> {
         Self::new(4096)
     }
 }
 
-impl<T> TraceRingBuffer<T> {
-    pub fn new(capacity: usize) -> TraceRingBuffer<T> {
+impl<T> RingBuffer<T> {
+    pub fn new(capacity: usize) -> RingBuffer<T> {
         assert!(capacity > TraceEntry::<T>::size());
-        TraceRingBuffer {
+        RingBuffer {
             data: vec![0; capacity],
             begin: 0,
             length: 0,
@@ -37,11 +37,11 @@ impl<T> TraceRingBuffer<T> {
         }
     }
 
-    pub fn iter(&self) -> TraceRingBufferIter<T> {
-        TraceRingBufferIter(if self.length == 0 {
-            TraceRingBufferIterState::Empty
+    pub fn iter(&self) -> RingBufferIter<T> {
+        RingBufferIter(if self.length == 0 {
+            RingBufferIterState::Empty
         } else {
-            TraceRingBufferIterState::NonEmpty {
+            RingBufferIterState::NonEmpty {
                 buffer: self,
                 idx: self.begin,
             }
@@ -76,7 +76,7 @@ impl<T> TraceRingBuffer<T> {
     }
 }
 
-impl<T> TraceSink<T> for TraceRingBuffer<T>
+impl<T> TraceSink<T> for RingBuffer<T>
     where T: Trace
 {
     fn trace_event(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
@@ -168,26 +168,26 @@ impl<T> TraceEntry<T> {
 }
 
 #[derive(Clone, Debug)]
-enum TraceRingBufferIterState<'a, T>
+enum RingBufferIterState<'a, T>
     where T: 'a
 {
     Empty,
     NonEmpty {
-        buffer: &'a TraceRingBuffer<T>,
+        buffer: &'a RingBuffer<T>,
         idx: usize,
     },
 }
 
 #[derive(Clone, Debug)]
-pub struct TraceRingBufferIter<'a, T>(TraceRingBufferIterState<'a, T>) where T: 'a;
+pub struct RingBufferIter<'a, T>(RingBufferIterState<'a, T>) where T: 'a;
 
-impl<'a, T> Iterator for TraceRingBufferIter<'a, T> {
+impl<'a, T> Iterator for RingBufferIter<'a, T> {
     type Item = TraceEntry<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let (next_state, result) = match self.0 {
-            TraceRingBufferIterState::Empty => return None,
-            TraceRingBufferIterState::NonEmpty { ref buffer, idx } => {
+            RingBufferIterState::Empty => return None,
+            RingBufferIterState::NonEmpty { ref buffer, idx } => {
                 let result = unsafe {
                     if idx + TraceEntry::<T>::size() > buffer.data.len() {
                         let mut temp = [0; 13];
@@ -204,9 +204,9 @@ impl<'a, T> Iterator for TraceRingBufferIter<'a, T> {
 
                 let next_idx = (idx + TraceEntry::<T>::size()) % buffer.data.len();
                 let next_state = if next_idx == buffer.end() {
-                    TraceRingBufferIterState::Empty
+                    RingBufferIterState::Empty
                 } else {
-                    TraceRingBufferIterState::NonEmpty {
+                    RingBufferIterState::NonEmpty {
                         buffer: buffer,
                         idx: next_idx,
                     }
@@ -235,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn trace_ring_buffer_no_roll_over() {
+    fn no_roll_over() {
         let mut buffer = SimpleTraceBuffer::new(100 * SimpleTraceEntry::size());
         buffer.trace_event(SimpleTrace::FooEvent, None);
         buffer.trace_start(SimpleTrace::OperationThing, None);
@@ -280,7 +280,7 @@ mod tests {
     }
 
     #[test]
-    fn trace_ring_buffer_with_roll_over() {
+    fn with_roll_over() {
         let mut buffer = SimpleTraceBuffer::new(5 * SimpleTraceEntry::size());
         buffer.trace_event(SimpleTrace::FooEvent, None);
         buffer.trace_start(SimpleTrace::OperationThing, None);
@@ -327,7 +327,7 @@ mod tests {
     }
 
     #[test]
-    fn trace_ring_buffer_with_roll_over_and_does_not_divide_evenly() {
+    fn with_roll_over_and_does_not_divide_evenly() {
         let mut buffer = SimpleTraceBuffer::new(3 * SimpleTraceEntry::size() + 1);
         buffer.trace_event(SimpleTrace::FooEvent, None);
         buffer.trace_start(SimpleTrace::OperationThing, None);

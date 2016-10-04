@@ -2,35 +2,38 @@
 
 #[cfg(test)]
 mod benches {
-    extern crate test;
-    extern crate z;
+    mod ring_buffer {
+        extern crate test;
+        extern crate z;
 
-    use self::z::traits::TraceSink;
-    use self::z::simple_trace::{SimpleTrace, SimpleTraceBuffer};
-    use std::sync::Mutex;
+        use self::z::simple_trace::{SimpleTrace, SimpleTraceBuffer};
+        use self::z::traits::TraceSink;
 
-    #[bench]
-    fn trace_ring_buffer_small_capacity(b: &mut test::Bencher) {
-        let mut buffer = SimpleTraceBuffer::new(27);
-        b.iter(|| buffer.trace_event(SimpleTrace::FooEvent, None));
-        test::black_box(buffer);
-    }
+        #[bench]
+        fn small_capacity(b: &mut test::Bencher) {
+            let mut buffer = SimpleTraceBuffer::new(27);
+            b.iter(|| buffer.trace_event(SimpleTrace::FooEvent, None));
+            test::black_box(buffer);
+        }
 
-    #[bench]
-    fn trace_ring_buffer_large_capacity(b: &mut test::Bencher) {
-        let mut buffer = SimpleTraceBuffer::new(2 * 1024 * 1024);
-        b.iter(|| buffer.trace_event(SimpleTrace::FooEvent, None));
-        test::black_box(buffer);
-    }
+        #[bench]
+        fn large_capacity(b: &mut test::Bencher) {
+            let mut buffer = SimpleTraceBuffer::new(2 * 1024 * 1024);
+            b.iter(|| buffer.trace_event(SimpleTrace::FooEvent, None));
+            test::black_box(buffer);
+        }
 
-    #[bench]
-    fn trace_ring_buffer_in_mutex(b: &mut test::Bencher) {
-        let buffer = Mutex::new(SimpleTraceBuffer::new(2 * 1024 * 1024));
-        b.iter(|| {
-            let mut buffer = buffer.lock().unwrap();
-            buffer.trace_event(SimpleTrace::FooEvent, None);
-        });
-        test::black_box(buffer);
+        #[bench]
+        fn in_mutex(b: &mut test::Bencher) {
+            use std::sync::Mutex;
+
+            let buffer = Mutex::new(SimpleTraceBuffer::new(2 * 1024 * 1024));
+            b.iter(|| {
+                let mut buffer = buffer.lock().unwrap();
+                buffer.trace_event(SimpleTrace::FooEvent, None);
+            });
+            test::black_box(buffer);
+        }
     }
 
     mod thread_and_local_id {

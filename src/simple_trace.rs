@@ -1,6 +1,6 @@
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use traits::{ThreadId, Trace, TraceId};
-use trace_ring_buffer::TraceRingBuffer;
+use ring_buffer::RingBuffer;
 
 /// A simple `Trace` type for tests, benches, and to serve as an example.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -55,7 +55,7 @@ impl TraceId for SimpleTraceId {
     }
 }
 
-pub type SimpleTraceBuffer = TraceRingBuffer<SimpleTrace>;
+pub type SimpleTraceBuffer = RingBuffer<SimpleTrace>;
 
 #[cfg(test)]
 mod tests {

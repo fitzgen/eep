@@ -1,5 +1,5 @@
-# `hydra`
+# `z`
 
-[![Build Status](https://travis-ci.org/fitzgen/hydra.png?branch=master)](https://travis-ci.org/fitzgen/hydra)
+[![Build Status](https://travis-ci.org/fitzgen/z.png?branch=master)](https://travis-ci.org/fitzgen/z)
 
 A work in progress.

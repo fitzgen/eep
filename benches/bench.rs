@@ -3,10 +3,10 @@
 #[cfg(test)]
 mod benches {
     extern crate test;
-    extern crate hydra;
+    extern crate z;
 
-    use self::hydra::traits::TraceSink;
-    use self::hydra::simple_trace::{SimpleTrace, SimpleTraceBuffer};
+    use self::z::traits::TraceSink;
+    use self::z::simple_trace::{SimpleTrace, SimpleTraceBuffer};
     use std::sync::Mutex;
 
     #[bench]
@@ -34,11 +34,11 @@ mod benches {
     }
 
     mod thread_and_local_id {
-        extern crate hydra;
+        extern crate z;
         extern crate test;
 
-        use self::hydra::thread_and_local_id::ThreadAndLocalId;
-        use self::hydra::traits::TraceId;
+        use self::z::thread_and_local_id::ThreadAndLocalId;
+        use self::z::traits::TraceId;
 
         #[bench]
         fn new_id(b: &mut test::Bencher) {
@@ -48,11 +48,11 @@ mod benches {
     }
 
     mod simple_trace_id {
-        extern crate hydra;
+        extern crate z;
         extern crate test;
 
-        use self::hydra::simple_trace::SimpleTraceId;
-        use self::hydra::traits::TraceId;
+        use self::z::simple_trace::SimpleTraceId;
+        use self::z::traits::TraceId;
 
         #[bench]
         fn new_id(b: &mut test::Bencher) {
@@ -63,12 +63,12 @@ mod benches {
 
     #[cfg(feature = "signpost")]
     mod signpost {
-        extern crate hydra;
+        extern crate z;
         extern crate test;
 
-        use self::hydra::signpost::Signpost;
-        use self::hydra::simple_trace::SimpleTrace;
-        use self::hydra::traits::TraceSink;
+        use self::z::signpost::Signpost;
+        use self::z::simple_trace::SimpleTrace;
+        use self::z::traits::TraceSink;
 
         #[bench]
         fn signpost_event(b: &mut test::Bencher) {

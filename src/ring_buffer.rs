@@ -403,8 +403,10 @@ mod tests {
         let mut buffer = SimpleTraceBuffer::default();
 
         let parent = buffer.trace_event(SimpleTrace::FooEvent, None);
-        let child = buffer.trace_start(SimpleTrace::OperationThing, Some(parent));
-        buffer.trace_stop(child, SimpleTrace::OperationThing);
+        let child1 = buffer.trace_start(SimpleTrace::OperationThing, Some(parent));
+        buffer.trace_stop(child1, SimpleTrace::OperationThing);
+        let child2 = buffer.trace_start(SimpleTrace::OperationThing, None);
+        buffer.trace_stop(child2, SimpleTrace::OperationThing);
 
         let mut iter = buffer.iter();
 
@@ -421,6 +423,20 @@ mod tests {
         assert_eq!(entry.kind(), TraceKind::Start);
         assert_eq!(entry.label(), "Thing");
         assert_eq!(entry.why(), Some(parent));
+
+        let entry = iter.next().unwrap();
+        println!("entry = {:#?}", entry);
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
+        assert_eq!(entry.kind(), TraceKind::Stop);
+        assert_eq!(entry.label(), "Thing");
+        assert_eq!(entry.why(), None);
+
+        let entry = iter.next().unwrap();
+        println!("entry = {:#?}", entry);
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
+        assert_eq!(entry.kind(), TraceKind::Start);
+        assert_eq!(entry.label(), "Thing");
+        assert_eq!(entry.why(), None);
 
         let entry = iter.next().unwrap();
         println!("entry = {:#?}", entry);

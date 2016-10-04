@@ -79,10 +79,11 @@ impl<T> RingBuffer<T> {
 impl<T> TraceSink<T> for RingBuffer<T>
     where T: Trace
 {
-    fn trace_event(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
+    fn trace_event(&mut self, trace: T, why: Option<T::Id>) -> T::Id {
         let id = T::Id::new_id();
 
         let entry: Entry<T> = Entry {
+            why: why.map(|id| (id.thread(), id.u32())),
             thread: id.thread(),
             timestamp: NsSinceEpoch::now(),
             id: id.u32(),
@@ -91,16 +92,17 @@ impl<T> TraceSink<T> for RingBuffer<T>
             phantom: PhantomData,
         };
 
-        let entry: [u8; 33] = unsafe { mem::transmute(entry) };
+        let entry: [u8; 65] = unsafe { mem::transmute(entry) };
         self.write(&entry);
 
         id
     }
 
-    fn trace_start(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
+    fn trace_start(&mut self, trace: T, why: Option<T::Id>) -> T::Id {
         let id = T::Id::new_id();
 
         let entry: Entry<T> = Entry {
+            why: why.map(|id| (id.thread(), id.u32())),
             thread: id.thread(),
             timestamp: NsSinceEpoch::now(),
             id: id.u32(),
@@ -109,7 +111,7 @@ impl<T> TraceSink<T> for RingBuffer<T>
             phantom: PhantomData,
         };
 
-        let entry: [u8; 33] = unsafe { mem::transmute(entry) };
+        let entry: [u8; 65] = unsafe { mem::transmute(entry) };
         self.write(&entry);
 
         id
@@ -117,6 +119,7 @@ impl<T> TraceSink<T> for RingBuffer<T>
 
     fn trace_stop(&mut self, id: T::Id, trace: T) {
         let entry: Entry<T> = Entry {
+            why: None,
             thread: id.thread(),
             timestamp: NsSinceEpoch::now(),
             id: id.u32(),
@@ -125,7 +128,7 @@ impl<T> TraceSink<T> for RingBuffer<T>
             phantom: PhantomData,
         };
 
-        let entry: [u8; 33] = unsafe { mem::transmute(entry) };
+        let entry: [u8; 65] = unsafe { mem::transmute(entry) };
         self.write(&entry);
     }
 }
@@ -154,6 +157,7 @@ pub enum TraceKind {
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Entry<T> {
+    why: Option<(Option<ThreadId>, u32)>,
     thread: Option<ThreadId>,
     id: u32,
     tag: u32,
@@ -191,6 +195,10 @@ impl<T> Entry<T> {
         self.id
     }
 
+    pub fn why(&self) -> Option<(Option<ThreadId>, u32)> {
+        self.why
+    }
+
     fn size() -> usize {
         mem::size_of::<Self>()
     }
@@ -219,7 +227,7 @@ impl<'a, T> Iterator for RingBufferIter<'a, T> {
             RingBufferIterState::NonEmpty { ref buffer, idx } => {
                 let result = unsafe {
                     if idx + Entry::<T>::size() > buffer.data.len() {
-                        let mut temp = [0; 33];
+                        let mut temp = [0; 65];
                         let middle = buffer.data.len() - idx;
                         temp[..middle].copy_from_slice(&buffer.data[idx..]);
                         temp[middle..]
@@ -260,7 +268,7 @@ mod tests {
 
     #[test]
     fn trace_entry_has_right_size() {
-        assert_eq!(SimpleEntry::size(), 33);
+        assert_eq!(SimpleEntry::size(), 65);
     }
 
     #[test]
@@ -388,5 +396,37 @@ mod tests {
         assert_eq!(entry.label(), "Another");
 
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn why() {
+        let mut buffer = SimpleTraceBuffer::default();
+
+        let parent = buffer.trace_event(SimpleTrace::FooEvent, None);
+        let child = buffer.trace_start(SimpleTrace::OperationThing, Some(parent));
+        buffer.trace_stop(child, SimpleTrace::OperationThing);
+
+        let mut iter = buffer.iter();
+
+        let entry = iter.next().unwrap();
+        println!("entry = {:#?}", entry);
+        assert_eq!(entry.tag(), SimpleTrace::FooEvent.tag());
+        assert_eq!(entry.kind(), TraceKind::Event);
+        assert_eq!(entry.label(), "Foo");
+        let parent = (entry.thread(), entry.id());
+
+        let entry = iter.next().unwrap();
+        println!("entry = {:#?}", entry);
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
+        assert_eq!(entry.kind(), TraceKind::Start);
+        assert_eq!(entry.label(), "Thing");
+        assert_eq!(entry.why(), Some(parent));
+
+        let entry = iter.next().unwrap();
+        println!("entry = {:#?}", entry);
+        assert_eq!(entry.tag(), SimpleTrace::OperationThing.tag());
+        assert_eq!(entry.kind(), TraceKind::Stop);
+        assert_eq!(entry.label(), "Thing");
+        assert_eq!(entry.why(), None);
     }
 }

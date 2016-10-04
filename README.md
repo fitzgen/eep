@@ -1,5 +1,5 @@
 # `hydra`
 
-[![]("https://travis-ci.org/fitzgen/hydra.svg?branch=master")](https://travis-ci.org/fitzgen/hydra)
+[![]("https://travis-ci.org/fitzgen/hydra.png?branch=master")](https://travis-ci.org/fitzgen/hydra)
 
 A work in progress.

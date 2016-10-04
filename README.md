@@ -1,6 +1,6 @@
 # `z`
 
-[![Build Status](https://travis-ci.org/fitzgen/z.png?branch=master)](https://travis-ci.org/fitzgen/z) [![crates.io](https://img.shields.io/crates/v/z.png)](https://crates.io/crates/z)
+[![Build Status](https://travis-ci.org/fitzgen/z.png?branch=master)](https://travis-ci.org/fitzgen/z) [![crates.io](https://img.shields.io/crates/v/z.png)](https://crates.io/crates/z) [![](https://docs.rs/z/badge.svg)](https://docs.rs/z)
 
 A work in progress.
 

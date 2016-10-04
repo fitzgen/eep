@@ -2,13 +2,18 @@
 name = "hydra"
 version = "0.1.0"
 authors = ["Nick Fitzgerald <fitzgen@gmail.com>"]
+description = "Still a work-in-progress..."
+documentation = "https://docs.rs/hydra"
+keywords = []
+license = "Apache-2.0/MIT"
+readme = "./README.md"
+repository = "https://github.com/fitzgen/hydra"
 
 [dependencies]
 leb128 = "0.2.1"
 time = "0.1.0"
 thread-id = "2.0.0"
 signpost = { version = "0.1.0", optional = true }
-
 
 # Enable debug information for profiling.
 [profile.release]

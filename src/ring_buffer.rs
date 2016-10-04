@@ -28,7 +28,7 @@ impl<T> Default for RingBuffer<T> {
 
 impl<T> RingBuffer<T> {
     pub fn new(capacity: usize) -> RingBuffer<T> {
-        assert!(capacity > TraceEntry::<T>::size());
+        assert!(capacity > Entry::<T>::size());
         RingBuffer {
             data: vec![0; capacity],
             begin: 0,
@@ -58,9 +58,9 @@ impl<T> RingBuffer<T> {
         let new_data_len = data.len();
         let capacity = self.data.len();
 
-        if capacity - self.length < TraceEntry::<T>::size() {
-            self.begin = (self.begin + TraceEntry::<T>::size()) % capacity;
-            self.length -= TraceEntry::<T>::size();
+        if capacity - self.length < Entry::<T>::size() {
+            self.begin = (self.begin + Entry::<T>::size()) % capacity;
+            self.length -= Entry::<T>::size();
         }
 
         if end + new_data_len > capacity {
@@ -71,7 +71,7 @@ impl<T> RingBuffer<T> {
             self.data[end..end + new_data_len].copy_from_slice(data);
         }
 
-        self.length += TraceEntry::<T>::size();
+        self.length += Entry::<T>::size();
         debug_assert!(self.length <= capacity);
     }
 }
@@ -80,7 +80,7 @@ impl<T> TraceSink<T> for RingBuffer<T>
     where T: Trace
 {
     fn trace_event(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
-        let entry: TraceEntry<T> = TraceEntry {
+        let entry: Entry<T> = Entry {
             timestamp: NsSinceEpoch::now(),
             tag: trace.tag(),
             kind: TraceKind::Event,
@@ -92,7 +92,7 @@ impl<T> TraceSink<T> for RingBuffer<T>
     }
 
     fn trace_start(&mut self, trace: T, _why: Option<T::Id>) -> T::Id {
-        let entry: TraceEntry<T> = TraceEntry {
+        let entry: Entry<T> = Entry {
             timestamp: NsSinceEpoch::now(),
             tag: trace.tag(),
             kind: TraceKind::Start,
@@ -104,7 +104,7 @@ impl<T> TraceSink<T> for RingBuffer<T>
     }
 
     fn trace_stop(&mut self, trace: T) {
-        let entry: TraceEntry<T> = TraceEntry {
+        let entry: Entry<T> = Entry {
             timestamp: NsSinceEpoch::now(),
             tag: trace.tag(),
             kind: TraceKind::Stop,
@@ -138,14 +138,14 @@ pub enum TraceKind {
 
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub struct TraceEntry<T> {
+pub struct Entry<T> {
     timestamp: NsSinceEpoch,
     tag: u32,
     kind: TraceKind,
     phantom: PhantomData<T>,
 }
 
-impl<T> TraceEntry<T>
+impl<T> Entry<T>
     where T: Trace
 {
     pub fn label(&self) -> &'static str {
@@ -153,7 +153,7 @@ impl<T> TraceEntry<T>
     }
 }
 
-impl<T> TraceEntry<T> {
+impl<T> Entry<T> {
     pub fn tag(&self) -> u32 {
         self.tag
     }
@@ -182,27 +182,27 @@ enum RingBufferIterState<'a, T>
 pub struct RingBufferIter<'a, T>(RingBufferIterState<'a, T>) where T: 'a;
 
 impl<'a, T> Iterator for RingBufferIter<'a, T> {
-    type Item = TraceEntry<T>;
+    type Item = Entry<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let (next_state, result) = match self.0 {
             RingBufferIterState::Empty => return None,
             RingBufferIterState::NonEmpty { ref buffer, idx } => {
                 let result = unsafe {
-                    if idx + TraceEntry::<T>::size() > buffer.data.len() {
+                    if idx + Entry::<T>::size() > buffer.data.len() {
                         let mut temp = [0; 13];
                         let middle = buffer.data.len() - idx;
                         temp[..middle].copy_from_slice(&buffer.data[idx..]);
                         temp[middle..]
-                            .copy_from_slice(&buffer.data[..TraceEntry::<T>::size() - middle]);
+                            .copy_from_slice(&buffer.data[..Entry::<T>::size() - middle]);
                         Some(mem::transmute(temp))
                     } else {
-                        let entry_ptr = buffer.data[idx..].as_ptr() as *const TraceEntry<T>;
+                        let entry_ptr = buffer.data[idx..].as_ptr() as *const Entry<T>;
                         Some(ptr::read(entry_ptr))
                     }
                 };
 
-                let next_idx = (idx + TraceEntry::<T>::size()) % buffer.data.len();
+                let next_idx = (idx + Entry::<T>::size()) % buffer.data.len();
                 let next_state = if next_idx == buffer.end() {
                     RingBufferIterState::Empty
                 } else {
@@ -227,16 +227,16 @@ mod tests {
     use simple_trace::{SimpleTrace, SimpleTraceBuffer};
     use traits::{Trace, TraceSink};
 
-    type SimpleTraceEntry = TraceEntry<SimpleTrace>;
+    type SimpleEntry = Entry<SimpleTrace>;
 
     #[test]
     fn trace_entry_has_right_size() {
-        assert_eq!(SimpleTraceEntry::size(), 13);
+        assert_eq!(SimpleEntry::size(), 13);
     }
 
     #[test]
     fn no_roll_over() {
-        let mut buffer = SimpleTraceBuffer::new(100 * SimpleTraceEntry::size());
+        let mut buffer = SimpleTraceBuffer::new(100 * SimpleEntry::size());
         buffer.trace_event(SimpleTrace::FooEvent, None);
         buffer.trace_start(SimpleTrace::OperationThing, None);
         buffer.trace_start(SimpleTrace::OperationAnother, None);
@@ -281,7 +281,7 @@ mod tests {
 
     #[test]
     fn with_roll_over() {
-        let mut buffer = SimpleTraceBuffer::new(5 * SimpleTraceEntry::size());
+        let mut buffer = SimpleTraceBuffer::new(5 * SimpleEntry::size());
         buffer.trace_event(SimpleTrace::FooEvent, None);
         buffer.trace_start(SimpleTrace::OperationThing, None);
         buffer.trace_start(SimpleTrace::OperationAnother, None);
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn with_roll_over_and_does_not_divide_evenly() {
-        let mut buffer = SimpleTraceBuffer::new(3 * SimpleTraceEntry::size() + 1);
+        let mut buffer = SimpleTraceBuffer::new(3 * SimpleEntry::size() + 1);
         buffer.trace_event(SimpleTrace::FooEvent, None);
         buffer.trace_start(SimpleTrace::OperationThing, None);
         buffer.trace_start(SimpleTrace::OperationAnother, None);

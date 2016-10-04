@@ -13,3 +13,6 @@ signpost = { version = "0.1.0", optional = true }
 # Enable debug information for profiling.
 [profile.release]
 debug = true
+
+[features]
+nightly = []

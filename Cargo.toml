@@ -1,13 +1,13 @@
 [package]
-name = "z"
+name = "eep"
 version = "0.1.0"
 authors = ["Nick Fitzgerald <fitzgen@gmail.com>"]
 description = "Still a work-in-progress..."
-documentation = "https://docs.rs/z"
+documentation = "https://docs.rs/eep"
 keywords = []
 license = "Apache-2.0/MIT"
 readme = "./README.md"
-repository = "https://github.com/fitzgen/z"
+repository = "https://github.com/fitzgen/eep"
 
 [dependencies]
 leb128 = "0.2.1"

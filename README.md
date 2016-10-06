@@ -1,6 +1,6 @@
-# `z`
+# `eep`
 
-[![Build Status](https://travis-ci.org/fitzgen/z.png?branch=master)](https://travis-ci.org/fitzgen/z) [![crates.io](https://img.shields.io/crates/v/z.png)](https://crates.io/crates/z) [![](https://docs.rs/z/badge.svg)](https://docs.rs/z)
+[![Build Status](https://travis-ci.org/fitzgen/eep.png?branch=master)](https://travis-ci.org/fitzgen/eep) [![crates.io](https://img.shields.io/crates/v/eep.png)](https://crates.io/crates/eep) [![](https://docs.rs/eep/badge.svg)](https://docs.rs/eep)
 
 A work in progress.
 
@@ -8,16 +8,16 @@ A work in progress.
 
 Either
 
-    $ cargo add z
+    $ cargo add eep
 
 or add this to your `Cargo.toml`:
 
     [dependencies]
-    z = "0.1.0"
+    eep = "0.1.0"
 
 ## Documentation
 
-* [Rustdocs documentation](https://docs.rs/z)
+* [Rustdocs documentation](https://docs.rs/eep)
 
 ## License
 

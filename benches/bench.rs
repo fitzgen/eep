@@ -4,10 +4,10 @@
 mod benches {
     mod ring_buffer {
         extern crate test;
-        extern crate z;
+        extern crate eep;
 
-        use self::z::simple_trace::{SimpleTrace, SimpleTraceBuffer};
-        use self::z::traits::TraceSink;
+        use self::eep::simple_trace::{SimpleTrace, SimpleTraceBuffer};
+        use self::eep::traits::TraceSink;
 
         #[bench]
         fn small_capacity(b: &mut test::Bencher) {
@@ -37,11 +37,11 @@ mod benches {
     }
 
     mod thread_and_local_id {
-        extern crate z;
+        extern crate eep;
         extern crate test;
 
-        use self::z::thread_and_local_id::ThreadAndLocalId;
-        use self::z::traits::TraceId;
+        use self::eep::thread_and_local_id::ThreadAndLocalId;
+        use self::eep::traits::TraceId;
 
         #[bench]
         fn new_id(b: &mut test::Bencher) {
@@ -51,11 +51,11 @@ mod benches {
     }
 
     mod simple_trace_id {
-        extern crate z;
+        extern crate eep;
         extern crate test;
 
-        use self::z::simple_trace::SimpleTraceId;
-        use self::z::traits::TraceId;
+        use self::eep::simple_trace::SimpleTraceId;
+        use self::eep::traits::TraceId;
 
         #[bench]
         fn new_id(b: &mut test::Bencher) {
@@ -66,12 +66,12 @@ mod benches {
 
     #[cfg(feature = "signpost")]
     mod signpost {
-        extern crate z;
+        extern crate eep;
         extern crate test;
 
-        use self::z::signpost::Signpost;
-        use self::z::simple_trace::SimpleTrace;
-        use self::z::traits::TraceSink;
+        use self::eep::signpost::Signpost;
+        use self::eep::simple_trace::SimpleTrace;
+        use self::eep::traits::TraceSink;
 
         #[bench]
         fn signpost_event(b: &mut test::Bencher) {

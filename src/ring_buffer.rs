@@ -225,17 +225,22 @@ impl<'a, T> Iterator for RingBufferIter<'a, T> {
         let (next_state, result) = match self.0 {
             RingBufferIterState::Empty => return None,
             RingBufferIterState::NonEmpty { ref buffer, idx } => {
-                let result = unsafe {
+                let entry: Entry<T> = unsafe {
                     if idx + Entry::<T>::size() > buffer.data.len() {
-                        let mut temp = [0; 65];
+                        // The entry is split across the end of the buffer and
+                        // wraps around to the front of it again.
+                        let entry: UnsafeCell<Entry<T>> = mem::uninitialized();
+                        let mut entry: [u8; 65] = mem::transmute(entry);
                         let middle = buffer.data.len() - idx;
-                        temp[..middle].copy_from_slice(&buffer.data[idx..]);
-                        temp[middle..]
-                            .copy_from_slice(&buffer.data[..Entry::<T>::size() - middle]);
-                        Some(mem::transmute(temp))
+                        entry[..middle].copy_from_slice(&buffer.data[idx..]);
+                        entry[middle..].copy_from_slice(&buffer.data[..Entry::<T>::size() - middle]);
+                        mem::transmute(entry)
                     } else {
-                        let entry_ptr = buffer.data[idx..].as_ptr() as *const Entry<T>;
-                        Some(ptr::read(entry_ptr))
+                        // The entry is in one contiguous block in the buffer.
+                        let entry: UnsafeCell<Entry<T>> = mem::uninitialized();
+                        let mut entry: [u8; 65] = mem::transmute(entry);
+                        entry.copy_from_slice(&buffer.data[idx..idx + Entry::<T>::size()]);
+                        mem::transmute(entry)
                     }
                 };
 
@@ -249,7 +254,7 @@ impl<'a, T> Iterator for RingBufferIter<'a, T> {
                     }
                 };
 
-                (next_state, result)
+                (next_state, Some(entry))
             }
         };
 

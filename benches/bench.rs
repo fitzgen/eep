@@ -3,8 +3,9 @@
 #[cfg(test)]
 mod benches {
     mod ring_buffer {
-        extern crate test;
         extern crate eep;
+        extern crate serde_json;
+        extern crate test;
 
         use self::eep::simple_trace::{SimpleTrace, SimpleTraceBuffer};
         use self::eep::traits::TraceSink;
@@ -33,6 +34,34 @@ mod benches {
                 buffer.trace_event(SimpleTrace::FooEvent, None);
             });
             test::black_box(buffer);
+        }
+
+        #[bench]
+        fn serialize_entry(b : &mut test::Bencher) {
+            let mut buffer = SimpleTraceBuffer::default();
+            buffer.trace_event(SimpleTrace::FooEvent, None);
+            let entry = buffer.iter().next().unwrap();
+
+            b.iter(|| {
+                test::black_box(serde_json::to_string(&entry).expect("should serialize OK"));
+            });
+        }
+
+        #[bench]
+        fn serialize_ring_buffer(b : &mut test::Bencher) {
+            let mut buffer = SimpleTraceBuffer::default();
+
+            for _ in 0..100 {
+                let event = buffer.trace_event(SimpleTrace::FooEvent, None);
+                let child1 = buffer.trace_start(SimpleTrace::OperationThing, Some(event));
+                let child2 = buffer.trace_start(SimpleTrace::OperationAnother, None);
+                buffer.trace_stop(child2, SimpleTrace::OperationThing);
+                buffer.trace_stop(child1, SimpleTrace::OperationAnother);
+            }
+
+            b.iter(|| {
+                test::black_box(serde_json::to_string(&buffer).expect("should serialize OK"));
+            });
         }
     }
 

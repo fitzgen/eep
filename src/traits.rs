@@ -1,3 +1,4 @@
+extern crate serde;
 extern crate thread_id;
 
 /// A unique identifier for a thread.
@@ -8,6 +9,14 @@ impl ThreadId {
     /// Get the current thread's ID.
     pub fn get() -> ThreadId {
         ThreadId(thread_id::get())
+    }
+}
+
+impl serde::Serialize for ThreadId {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer
+    {
+        serializer.serialize_newtype_struct("ThreadId", self.0)
     }
 }
 

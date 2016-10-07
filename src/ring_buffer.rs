@@ -1,8 +1,10 @@
+extern crate serde;
 extern crate time;
 
+use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr;
 
 use traits::{ThreadId, Trace, TraceId, TraceSink};
 
@@ -133,6 +135,45 @@ impl<T> TraceSink<T> for RingBuffer<T>
     }
 }
 
+impl<T> serde::Serialize for RingBuffer<T>
+    where T: Trace
+{
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer
+    {
+        // Build up all the entries' labels in a map keyed by T's tag, serialize
+        // that, and then serialize the individual entries.
+
+        struct Entries<'a, T>(&'a RingBuffer<T>) where T: 'a + Trace;
+
+        impl<'a, T> serde::Serialize for Entries<'a, T>
+            where T: Trace
+        {
+            fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+                where S: serde::Serializer
+            {
+                let mut state = try!(serializer.serialize_seq(None));
+                for entry in self.0.iter() {
+                    try!(serializer.serialize_seq_elt(&mut state, entry));
+                }
+                serializer.serialize_seq_end(state)
+            }
+        }
+
+        let mut labels = HashMap::new();
+        for entry in self.iter() {
+            let tag = entry.tag();
+            // Turn the key into a string to support JSON.
+            labels.insert(format!("{}", tag), T::label(tag));
+        }
+
+        let mut state = try!(serializer.serialize_struct("RingBuffer", 2));
+        try!(serializer.serialize_struct_elt(&mut state, "labels", labels));
+        try!(serializer.serialize_struct_elt(&mut state, "entries", Entries(self)));
+        serializer.serialize_struct_end(state)
+    }
+}
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct NsSinceEpoch(pub u64);
 
@@ -146,12 +187,32 @@ impl NsSinceEpoch {
     }
 }
 
+impl serde::Serialize for NsSinceEpoch {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer
+    {
+        serializer.serialize_newtype_struct("NsSinceEpoch", self.0)
+    }
+}
+
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum TraceKind {
     Event = 0x0,
     Start = 0x1,
     Stop = 0x2,
+}
+
+impl serde::Serialize for TraceKind {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer
+    {
+        match *self {
+            TraceKind::Event => serializer.serialize_unit_variant("TraceKind", 0, "Event"),
+            TraceKind::Start => serializer.serialize_unit_variant("TraceKind", 1, "Start"),
+            TraceKind::Stop => serializer.serialize_unit_variant("TraceKind", 2, "Stop"),
+        }
+    }
 }
 
 #[repr(packed)]
@@ -201,6 +262,21 @@ impl<T> Entry<T> {
 
     fn size() -> usize {
         mem::size_of::<Self>()
+    }
+}
+
+impl<T> serde::Serialize for Entry<T> {
+    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+        where S: serde::Serializer
+    {
+        let mut state = try!(serializer.serialize_struct("Entry", 6));
+        try!(serializer.serialize_struct_elt(&mut state, "why", &self.why));
+        try!(serializer.serialize_struct_elt(&mut state, "thread", &self.thread));
+        try!(serializer.serialize_struct_elt(&mut state, "id", self.id));
+        try!(serializer.serialize_struct_elt(&mut state, "tag", self.tag));
+        try!(serializer.serialize_struct_elt(&mut state, "timestamp", self.timestamp));
+        try!(serializer.serialize_struct_elt(&mut state, "kind", self.kind));
+        serializer.serialize_struct_end(state)
     }
 }
 
@@ -265,6 +341,8 @@ impl<'a, T> Iterator for RingBufferIter<'a, T> {
 
 #[cfg(test)]
 mod tests {
+    extern crate serde_json;
+
     use super::*;
     use simple_trace::{SimpleTrace, SimpleTraceBuffer};
     use traits::{Trace, TraceSink};
@@ -449,5 +527,37 @@ mod tests {
         assert_eq!(entry.kind(), TraceKind::Stop);
         assert_eq!(entry.label(), "Thing");
         assert_eq!(entry.why(), None);
+    }
+
+    #[test]
+    fn serialize_entry() {
+        let mut buffer = SimpleTraceBuffer::new(2 * SimpleEntry::size());
+        buffer.trace_event(SimpleTrace::FooEvent, None);
+        let entry = buffer.iter().next().unwrap();
+
+        let serialized = serde_json::to_string_pretty(&entry)
+            .expect("should serialize OK");
+
+        println!("");
+        println!("serialized = {}", serialized);
+    }
+
+    #[test]
+    fn serialize_ring_buffer() {
+        let mut buffer = SimpleTraceBuffer::new(10 * SimpleEntry::size());
+
+        for _ in 0..10 {
+            let event = buffer.trace_event(SimpleTrace::FooEvent, None);
+            let child1 = buffer.trace_start(SimpleTrace::OperationThing, Some(event));
+            let child2 = buffer.trace_start(SimpleTrace::OperationAnother, None);
+            buffer.trace_stop(child2, SimpleTrace::OperationThing);
+            buffer.trace_stop(child1, SimpleTrace::OperationAnother);
+        }
+
+        let serialized = serde_json::to_string_pretty(&buffer)
+            .expect("should serialize OK");
+
+        println!("");
+        println!("serialized = {}", serialized);
     }
 }

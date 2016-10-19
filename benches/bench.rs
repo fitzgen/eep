@@ -65,17 +65,17 @@ mod benches {
         }
     }
 
-    mod thread_and_local_id {
+    mod threaded_trace_id {
         extern crate eep;
         extern crate test;
 
-        use self::eep::thread_and_local_id::ThreadAndLocalId;
+        use self::eep::threaded_trace_id::ThreadedTraceId;
         use self::eep::traits::TraceId;
 
         #[bench]
         fn new_id(b: &mut test::Bencher) {
-            ThreadAndLocalId::new_id();
-            b.iter(|| test::black_box(ThreadAndLocalId::new_id()));
+            ThreadedTraceId::new_id();
+            b.iter(|| test::black_box(ThreadedTraceId::new_id()));
         }
     }
 

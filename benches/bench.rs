@@ -65,6 +65,38 @@ mod benches {
         }
     }
 
+    mod toggle_sink_enabled {
+        extern crate eep;
+        extern crate test;
+
+        use self::eep::simple_trace::{SimpleTrace, SimpleTraceBuffer};
+        use self::eep::toggle_sink::ToggleSink;
+        use self::eep::traits::TraceSink;
+
+        #[bench]
+        fn trace(b: &mut test::Bencher) {
+            let mut sink = ToggleSink::new_enabled(SimpleTraceBuffer::default());
+            b.iter(|| sink.trace_event(SimpleTrace::FooEvent, None));
+            test::black_box(sink);
+        }
+    }
+
+    mod toggle_sink_disabled {
+        extern crate eep;
+        extern crate test;
+
+        use self::eep::simple_trace::{SimpleTrace, SimpleTraceBuffer};
+        use self::eep::toggle_sink::ToggleSink;
+        use self::eep::traits::TraceSink;
+
+        #[bench]
+        fn trace(b: &mut test::Bencher) {
+            let mut sink = ToggleSink::new_disabled(SimpleTraceBuffer::default());
+            b.iter(|| sink.trace_event(SimpleTrace::FooEvent, None));
+            test::black_box(sink);
+        }
+    }
+
     mod threaded_trace_id {
         extern crate eep;
         extern crate test;

@@ -7,4 +7,5 @@ pub mod ring_buffer;
 pub mod signpost;
 pub mod simple_trace;
 pub mod threaded_trace_id;
+pub mod toggle_sink;
 pub mod traits;

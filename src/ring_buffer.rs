@@ -309,7 +309,8 @@ impl<'a, T> Iterator for RingBufferIter<'a, T> {
                         let mut entry: [u8; 65] = mem::transmute(entry);
                         let middle = buffer.data.len() - idx;
                         entry[..middle].copy_from_slice(&buffer.data[idx..]);
-                        entry[middle..].copy_from_slice(&buffer.data[..Entry::<T>::size() - middle]);
+                        entry[middle..]
+                            .copy_from_slice(&buffer.data[..Entry::<T>::size() - middle]);
                         mem::transmute(entry)
                     } else {
                         // The entry is in one contiguous block in the buffer.
@@ -535,8 +536,7 @@ mod tests {
         buffer.trace_event(SimpleTrace::FooEvent, None);
         let entry = buffer.iter().next().unwrap();
 
-        let serialized = serde_json::to_string_pretty(&entry)
-            .expect("should serialize OK");
+        let serialized = serde_json::to_string_pretty(&entry).expect("should serialize OK");
 
         println!("");
         println!("serialized = {}", serialized);
@@ -554,8 +554,7 @@ mod tests {
             buffer.trace_stop(child1, SimpleTrace::OperationAnother);
         }
 
-        let serialized = serde_json::to_string_pretty(&buffer)
-            .expect("should serialize OK");
+        let serialized = serde_json::to_string_pretty(&buffer).expect("should serialize OK");
 
         println!("");
         println!("serialized = {}", serialized);

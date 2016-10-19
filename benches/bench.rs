@@ -37,7 +37,7 @@ mod benches {
         }
 
         #[bench]
-        fn serialize_entry(b : &mut test::Bencher) {
+        fn serialize_entry(b: &mut test::Bencher) {
             let mut buffer = SimpleTraceBuffer::default();
             buffer.trace_event(SimpleTrace::FooEvent, None);
             let entry = buffer.iter().next().unwrap();
@@ -48,7 +48,7 @@ mod benches {
         }
 
         #[bench]
-        fn serialize_ring_buffer(b : &mut test::Bencher) {
+        fn serialize_ring_buffer(b: &mut test::Bencher) {
             let mut buffer = SimpleTraceBuffer::default();
 
             for _ in 0..100 {

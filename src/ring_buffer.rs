@@ -1,3 +1,5 @@
+//! TODO FITZGEN
+
 extern crate serde;
 extern crate time;
 
@@ -5,9 +7,9 @@ use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::mem;
-
 use traits::{ThreadId, Trace, TraceId, TraceSink};
 
+/// TODO FITZGEN
 #[derive(Clone, Debug)]
 pub struct RingBuffer<T> {
     // The data itself.
@@ -29,6 +31,7 @@ impl<T> Default for RingBuffer<T> {
 }
 
 impl<T> RingBuffer<T> {
+    /// Construct a new `RingBuffer` with the given capacity.
     pub fn new(capacity: usize) -> RingBuffer<T> {
         assert!(capacity > Entry::<T>::size());
         RingBuffer {
@@ -39,6 +42,7 @@ impl<T> RingBuffer<T> {
         }
     }
 
+    /// Iterate over the `Entry<T>` in this `RingBuffer<T>`.
     pub fn iter(&self) -> RingBufferIter<T> {
         RingBufferIter(if self.length == 0 {
             RingBufferIterState::Empty
@@ -174,10 +178,12 @@ impl<T> serde::Serialize for RingBuffer<T>
     }
 }
 
+/// Nanoseconds since the epoch.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct NsSinceEpoch(pub u64);
 
 impl NsSinceEpoch {
+    /// Get the current nanoseconds since the epoch.
     #[inline(always)]
     pub fn now() -> NsSinceEpoch {
         let timespec = time::get_time();
@@ -195,11 +201,15 @@ impl serde::Serialize for NsSinceEpoch {
     }
 }
 
+/// The kind of trace an entry represents.
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum TraceKind {
+    /// A one off event.
     Event = 0x0,
+    /// The start of some operation.
     Start = 0x1,
+    /// The end of some operation.
     Stop = 0x2,
 }
 
@@ -215,6 +225,7 @@ impl serde::Serialize for TraceKind {
     }
 }
 
+/// An `Entry<T>` is a single trace, why it happened, on which thread, and when.
 #[repr(packed)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Entry<T> {
@@ -230,32 +241,40 @@ pub struct Entry<T> {
 impl<T> Entry<T>
     where T: Trace
 {
+    /// Get the label of this trace entry.
     pub fn label(&self) -> &'static str {
         T::label(self.tag)
     }
 }
 
 impl<T> Entry<T> {
+    /// Get the tag for this trace entry.
     pub fn tag(&self) -> u32 {
         self.tag
     }
 
+    /// Get the kind of trace this entry represents.
     pub fn kind(&self) -> TraceKind {
         self.kind
     }
 
+    /// Get the timestamp when this trace ocurred.
     pub fn timestamp(&self) -> NsSinceEpoch {
         self.timestamp
     }
 
+    /// Get the thread that traced this entry, if available.
     pub fn thread(&self) -> Option<ThreadId> {
         self.thread
     }
 
+    /// Get the ID of this entry.
     pub fn id(&self) -> u32 {
         self.id
     }
 
+    /// Get the thread ID and trace ID of the trace that triggered this entry's
+    /// trace, if available.
     pub fn why(&self) -> Option<(Option<ThreadId>, u32)> {
         self.why
     }
@@ -291,6 +310,7 @@ enum RingBufferIterState<'a, T>
     },
 }
 
+/// An iterator over `Entry<T>`s in a `RingBuffer<T>`.
 #[derive(Clone, Debug)]
 pub struct RingBufferIter<'a, T>(RingBufferIterState<'a, T>) where T: 'a;
 

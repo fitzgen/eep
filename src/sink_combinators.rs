@@ -1,3 +1,6 @@
+//! Combinators for building up complex `TraceSink` implementations from simple
+//! parts.
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use traits::{Trace, TraceId, TraceSink};
 

@@ -70,7 +70,7 @@ mod benches {
         extern crate test;
 
         use self::eep::simple_trace::{SimpleTrace, SimpleTraceBuffer};
-        use self::eep::toggle_sink::ToggleSink;
+        use self::eep::sink_combinators::ToggleSink;
         use self::eep::traits::TraceSink;
 
         #[bench]
@@ -86,7 +86,7 @@ mod benches {
         extern crate test;
 
         use self::eep::simple_trace::{SimpleTrace, SimpleTraceBuffer};
-        use self::eep::toggle_sink::ToggleSink;
+        use self::eep::sink_combinators::ToggleSink;
         use self::eep::traits::TraceSink;
 
         #[bench]
@@ -101,7 +101,7 @@ mod benches {
         extern crate eep;
         extern crate test;
 
-        use self::eep::threaded_trace_id::ThreadedTraceId;
+        use self::eep::ThreadedTraceId;
         use self::eep::traits::TraceId;
 
         #[bench]

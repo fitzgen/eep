@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 use traits::{ThreadId, TraceId};
 
+/// A `TraceId` implementation that is a pair of a thread ID and a thread-local
+/// monotonically increasing ID counter.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct ThreadedTraceId(pub ThreadId, pub u32);
 

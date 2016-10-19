@@ -1,3 +1,5 @@
+//! A simple `Trace` implementation for testing and to serve as an example.
+
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use traits::{ThreadId, Trace, TraceId};
 use ring_buffer::RingBuffer;
@@ -5,8 +7,11 @@ use ring_buffer::RingBuffer;
 /// A simple `Trace` type for tests, benches, and to serve as an example.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum SimpleTrace {
+    /// Some one off "foo" event.
     FooEvent,
+    /// Some "thing" operation.
     OperationThing,
+    /// Some "Another" operation.
     OperationAnother,
 }
 
@@ -31,6 +36,7 @@ impl Trace for SimpleTrace {
     }
 }
 
+/// A global, monotonically increasing (and eventually wrapping) counter.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct SimpleTraceId(pub u32);
 
@@ -51,6 +57,7 @@ impl TraceId for SimpleTraceId {
     }
 }
 
+/// A `RingBuffer<T>` sink for `SimpleTrace`.
 pub type SimpleTraceBuffer = RingBuffer<SimpleTrace>;
 
 #[cfg(test)]
